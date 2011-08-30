@@ -27,7 +27,10 @@
 package org.spurint.android.net;
 
 import java.io.IOException;
-import java.util.ArrayDeque;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -43,77 +46,99 @@ import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
 import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.HttpConnectionParams;
 
-import android.os.AsyncTask;
+import android.os.Handler;
 import android.util.Log;
 
 public class Network {
     private static final String TAG = "Network";
+    
+    private static final int CORE_POOL_SIZE = 4;
+    private static final int MAX_POOL_SIZE = CORE_POOL_SIZE;
+    private static final ExecutorService pool = new ThreadPoolExecutor(CORE_POOL_SIZE,
+                                                                       MAX_POOL_SIZE,
+                                                                       30, TimeUnit.SECONDS,
+                                                                       new LinkedBlockingQueue<Runnable>());
+    private static final Handler handler = new Handler();
 
     public interface Cancellable {
         public boolean cancel();
-        public boolean cancelled();
-        public boolean finished();
+        public boolean isCancelled();
+        public boolean isFinished();
     }
 
     public interface RequestListener {
         void onRequestFinished(HttpResponse resp);
         void onRequestError(Exception e);
+        void onRequestCancelled();
     }
 
-    private static class NetworkAsyncTask extends AsyncTask<HttpUriRequest, Void, Object> implements Cancellable {
+    private static class NetworkTask implements Runnable, Cancellable {
         private HttpClient httpClient;
         private RequestListener listener;
-        private Network network;
         private HttpUriRequest request;
-        private boolean cancelled;
+        private Boolean cancellable = true;
+        private boolean cancelled = false;
+        private Boolean finished = false;
 
-        NetworkAsyncTask(HttpClient httpClient,
-                         HttpUriRequest request,
-                         RequestListener listener,
-                         Network network)
+        NetworkTask(HttpClient httpClient,
+                    HttpUriRequest request,
+                    RequestListener listener)
         {
             this.httpClient = httpClient;
             this.request = request;
             this.listener = listener;
-            this.network = network;
-        }
-
-        HttpUriRequest getRequest() {
-            return request;
         }
 
         @Override
-        protected Object doInBackground(HttpUriRequest...requests)
+        public void run()
         {
+            synchronized (cancellable) {
+                if (cancelled) {
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            listener.onRequestCancelled();
+                        }
+                    });
+                    return;
+                } else {
+                    cancellable = false;
+                }
+            }
+
+            HttpResponse resp = null;
+            Exception err = null;
+            
             try {
                 Log.d(TAG, "starting http request");
-                HttpResponse resp = httpClient.execute(requests[0]);
-                return resp;
+                resp = httpClient.execute(request);
             } catch (Exception e) {
-                return e;
+                err = e;
             }
+        
+            synchronized (finished) {
+                finished = true;
+            }
+            
+            final HttpResponse finalResp = resp;
+            final Exception finalErr = err;
+            handler.post(new Runnable() {
+                @Override
+                public void run() {
+                    if (finalErr != null) {
+                        listener.onRequestError(finalErr);
+                    } else if (finalResp != null) {
+                        Log.d(TAG, "got http response code " + finalResp.getStatusLine().getStatusCode());
+                        HttpEntity entity = finalResp.getEntity();
+                        Log.d(TAG, "body is type " + entity.getContentType() + ", length " + entity.getContentLength());
+                        listener.onRequestFinished(finalResp);
+                    } 
+                }
+            });
         }
 
         @Override
-        protected void onPostExecute(Object obj)
-        {
-            network.notifyDone(this);
-
-            Log.d(TAG, "post execute: " + obj.toString());
-
-            if (obj instanceof HttpResponse) {
-                HttpResponse resp = (HttpResponse)obj;
-                Log.d(TAG, "got http response code " + resp.getStatusLine().getStatusCode());
-                HttpEntity entity = resp.getEntity();
-                Log.d(TAG, "body is type " + entity.getContentType() + ", length " + entity.getContentLength());
-                listener.onRequestFinished((HttpResponse)obj);
-            } else
-                listener.onRequestError((Exception)obj);
-        }
-
-        // annoyingly, isCancelled() is final, so we can't override
-        @Override
-        public boolean cancelled()
+        public boolean isCancelled()
         {
             return cancelled;
         }
@@ -121,35 +146,33 @@ public class Network {
         @Override
         public boolean cancel()
         {
-            if (!cancelled) {
-                if (network.cancelTask(this)) {
-                    cancelled = true;
-                    listener.onRequestError(new Exception("Cancelled"));
+            synchronized (cancellable) {
+                if (cancellable) {
+                    if (!cancelled) {
+                        cancelled = true;
+                        listener.onRequestCancelled();
+                    }
                 }
             }
-
+            
             return cancelled;
         }
 
         @Override
-        public boolean finished()
+        public boolean isFinished()
         {
-            return getStatus() == Status.FINISHED;
+            synchronized (finished) {
+                return finished;
+            }
         }
     }
 
     private static final int CONN_TIMEOUT = 30000;
     private static final int SO_TIMEOUT = 45000;
 
-    private static final int MAX_TASKS_IN_FLIGHT = 32;
-
     private static final Network instance = new Network();
 
     private HttpClient httpClient;
-    // we can't set the depth of the thread pool before honeycomb, so this
-    // is how we'll prevent overrunning the thread pool's queue...
-    private ArrayDeque<NetworkAsyncTask> queue = new ArrayDeque<NetworkAsyncTask>(64);
-    private int tasksInFlight;
 
     public static synchronized Network get()
     {
@@ -176,9 +199,8 @@ public class Network {
 
     public Cancellable executeAsync(final HttpUriRequest request, final RequestListener listener)
     {
-        NetworkAsyncTask task = new NetworkAsyncTask(httpClient, request, listener, this);
-        queue.add(task);
-        handleQueue();
+        NetworkTask task = new NetworkTask(httpClient, request, listener);
+        pool.execute(task);
         return task;
     }
 
@@ -192,26 +214,5 @@ public class Network {
         } catch (IOException e) {
             listener.onRequestError(e);
         }
-    }
-
-    private void handleQueue()
-    {
-        while (tasksInFlight < MAX_TASKS_IN_FLIGHT && !queue.isEmpty()) {
-            NetworkAsyncTask task = queue.remove();
-            task.execute(task.getRequest());
-            ++tasksInFlight;
-        }
-    }
-
-    void notifyDone(NetworkAsyncTask task)
-    {
-        --tasksInFlight;
-        handleQueue();
-
-    }
-
-    boolean cancelTask(NetworkAsyncTask task)
-    {
-        return queue.remove(task) || task.cancel(false);
     }
 }
