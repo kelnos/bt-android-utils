@@ -27,14 +27,20 @@
 package org.spurint.android.net;
 
 import java.io.IOException;
+import java.util.Locale;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.http.Header;
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpException;
+import org.apache.http.HttpRequest;
+import org.apache.http.HttpRequestInterceptor;
 import org.apache.http.HttpResponse;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.scheme.PlainSocketFactory;
@@ -45,11 +51,14 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
 import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.HttpConnectionParams;
+import org.apache.http.protocol.HttpContext;
 
+import android.os.Build;
 import android.os.Handler;
 import android.util.Log;
 
-public class Network {
+public class Network
+{
     private static final String TAG = "Network";
     
     private static final int CORE_POOL_SIZE = 4;
@@ -60,25 +69,17 @@ public class Network {
                                                                        new LinkedBlockingQueue<Runnable>());
     private static final Handler handler = new Handler();
 
-    public interface Cancellable {
-        public boolean cancel();
-        public boolean isCancelled();
-        public boolean isFinished();
-    }
-
-    public interface RequestListener {
+    public interface RequestListener
+    {
         void onRequestFinished(HttpResponse resp);
         void onRequestError(Exception e);
-        void onRequestCancelled();
     }
 
-    private static class NetworkTask implements Runnable, Cancellable {
+    private static class NetworkTask implements Callable<HttpResponse>
+    {
         private HttpClient httpClient;
         private RequestListener listener;
         private HttpUriRequest request;
-        private Boolean cancellable = true;
-        private boolean cancelled = false;
-        private Boolean finished = false;
 
         NetworkTask(HttpClient httpClient,
                     HttpUriRequest request,
@@ -90,34 +91,19 @@ public class Network {
         }
 
         @Override
-        public void run()
+		public HttpResponse call() throws Exception
         {
-            synchronized (cancellable) {
-                if (cancelled) {
-                    handler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            listener.onRequestCancelled();
-                        }
-                    });
-                    return;
-                } else {
-                    cancellable = false;
-                }
-            }
-
             HttpResponse resp = null;
             Exception err = null;
+            
+            if (Thread.interrupted())
+            	return null;
             
             try {
                 Log.d(TAG, "starting http request");
                 resp = httpClient.execute(request);
             } catch (Exception e) {
                 err = e;
-            }
-        
-            synchronized (finished) {
-                finished = true;
             }
             
             final HttpResponse finalResp = resp;
@@ -135,35 +121,8 @@ public class Network {
                     } 
                 }
             });
-        }
-
-        @Override
-        public boolean isCancelled()
-        {
-            return cancelled;
-        }
-
-        @Override
-        public boolean cancel()
-        {
-            synchronized (cancellable) {
-                if (cancellable) {
-                    if (!cancelled) {
-                        cancelled = true;
-                        listener.onRequestCancelled();
-                    }
-                }
-            }
             
-            return cancelled;
-        }
-
-        @Override
-        public boolean isFinished()
-        {
-            synchronized (finished) {
-                return finished;
-            }
+            return resp;
         }
     }
 
@@ -172,7 +131,7 @@ public class Network {
 
     private static final Network instance = new Network();
 
-    private HttpClient httpClient;
+    private DefaultHttpClient httpClient;
 
     public static synchronized Network get()
     {
@@ -195,24 +154,24 @@ public class Network {
 
         ThreadSafeClientConnManager connManager = new ThreadSafeClientConnManager(params, registry);
         httpClient = new DefaultHttpClient(connManager, params);
+        httpClient.addRequestInterceptor(new HttpRequestInterceptor() {
+            @Override
+            public void process(HttpRequest request, HttpContext context) throws HttpException, IOException
+            {
+                Locale locale = Locale.getDefault();
+                String localeStr = locale.getLanguage() + "_" + locale.getCountry();
+                request.setHeader("User-Agent", "BTNetwork (Android; Android OS " + Build.VERSION.RELEASE + "; " + localeStr + ")");
+                Header[] headers = request.getAllHeaders();
+                for (Header h : headers) {
+                    Log.d(TAG, h.getName() + ": " + h.getValue());
+                }
+            }
+        });
     }
 
-    public Cancellable executeAsync(final HttpUriRequest request, final RequestListener listener)
+    public Future<HttpResponse> execute(final HttpUriRequest request, final RequestListener listener)
     {
         NetworkTask task = new NetworkTask(httpClient, request, listener);
-        pool.execute(task);
-        return task;
-    }
-
-    public void executeSync(HttpUriRequest request, RequestListener listener)
-    {
-        try {
-            HttpResponse resp = httpClient.execute(request);
-            listener.onRequestFinished(resp);
-        } catch (ClientProtocolException e) {
-            listener.onRequestError(e);
-        } catch (IOException e) {
-            listener.onRequestError(e);
-        }
+        return pool.submit(task);
     }
 }
