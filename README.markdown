@@ -2,7 +2,9 @@ Intro
 =====
 
 This is a set of classes I've created and I've found useful while creating
-Android applications.  So far this includes 2 things:
+Android applications.  Note that these do not represent final or stable APIs.
+I'm still very much playing around with things and will change how these work
+as I find better ways of doing things.
 
 org.spurint.android.listview
 ----------------------------
@@ -16,7 +18,15 @@ org.spurint.android.net
 -----------------------
 
 Wrapper class around Apache's HttpClient class to make it easy to do
-async network requests.  Uses AsyncTask under the hood.
+async, cancellable network requests.
+
+org.spurint.android.viewcontroller
+----------------------------------
+
+This aims to be a (somewhat simpler) version of iOS's ViewController concept.
+What I really missed when starting to work on Android was
+UINavigationController.  This is super simple right now.  I intend to add
+more to this over time.
 
 Usage
 =====
