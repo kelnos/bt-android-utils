@@ -29,12 +29,7 @@ public abstract class ViewController
     {
         activity.setContentView(contentView);
     }
-    
-    public void detachContentView()
-    {
-        activity.setContentView(null);
-    }
-    
+
     protected void _setNavigationController(NavigationController navigationController)
     {
         this.navigationController = navigationController;
