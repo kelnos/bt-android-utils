@@ -4,6 +4,15 @@ import android.app.Activity;
 import android.view.LayoutInflater;
 import android.view.View;
 
+/*
+ * TODO:
+ * * Need to use a weak-key/weak-value version of WeakHashMap to keep track
+ *   of Activity->ViewController pairs so we know which VC is the active one
+ *   on the Activity.  That way I can fire off the appear/disappear callbacks
+ *   properly.  With a regular WeakHashMap we'll retain the Activity instances
+ *   and they'll never get GC'd.
+ */
+
 public abstract class ViewController
 {
     private final int layoutId;
@@ -27,8 +36,15 @@ public abstract class ViewController
     
     public void attachContentView()
     {
+        onViewWillAppear();
         activity.setContentView(contentView);
+        onViewAppeared();
     }
+
+    protected void onViewWillAppear() { }
+    protected void onViewAppeared() { }
+    //protected void onViewWillDisappear() { }
+    //protected void onViewDisappeared() { }
 
     protected void _setNavigationController(NavigationController navigationController)
     {
