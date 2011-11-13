@@ -41,7 +41,8 @@ public class SectionHeaderRow extends ListRow {
     }
 
     @Override
-    public View getView(Context context) {
+    public View getView(Context context, View convertView)
+    {
     	final LinearLayout layout = new LinearLayout(context);
 
     	final LayoutInflater inflater = (LayoutInflater)context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);

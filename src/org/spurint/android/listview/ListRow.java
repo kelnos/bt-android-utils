@@ -28,14 +28,20 @@ package org.spurint.android.listview;
 
 import android.content.Context;
 import android.view.View;
+import android.widget.Adapter;
 
 public abstract class ListRow
 {
-    public abstract View getView(Context context);
+    public abstract View getView(Context context, View convertView);
     public abstract String getTitle();
     
     public boolean isEnabled()
     {
         return true;
+    }
+    
+    public int getItemViewType()
+    {
+        return Adapter.IGNORE_ITEM_VIEW_TYPE;
     }
 }
