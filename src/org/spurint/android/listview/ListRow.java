@@ -29,7 +29,13 @@ package org.spurint.android.listview;
 import android.content.Context;
 import android.view.View;
 
-public interface ListRow {
-    public View getView(Context context);
-    public String getTitle();
+public abstract class ListRow
+{
+    public abstract View getView(Context context);
+    public abstract String getTitle();
+    
+    public boolean isEnabled()
+    {
+        return true;
+    }
 }

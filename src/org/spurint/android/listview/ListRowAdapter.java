@@ -63,7 +63,8 @@ public class ListRowAdapter extends ArrayAdapter<ListRow> {
     }
 
     @Override
-    public boolean isEnabled(int position) {
-        return !(items.get(position) instanceof SectionHeaderRow);
+    public boolean isEnabled(int position)
+    {
+        return items.get(position).isEnabled();
     }
 }

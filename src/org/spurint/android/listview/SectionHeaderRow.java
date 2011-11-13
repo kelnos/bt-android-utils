@@ -33,8 +33,8 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-public class SectionHeaderRow implements ListRow {
-    private String title;
+public class SectionHeaderRow extends ListRow {
+    private final String title;
 
     public SectionHeaderRow(String title) {
         this.title = title;
@@ -64,5 +64,11 @@ public class SectionHeaderRow implements ListRow {
     @Override
     public String getTitle() {
         return title;
+    }
+    
+    @Override
+    public boolean isEnabled()
+    {
+        return false;
     }
 }
