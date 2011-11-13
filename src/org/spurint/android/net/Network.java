@@ -77,9 +77,9 @@ public class Network
 
     private static class NetworkTask implements Callable<HttpResponse>
     {
-        private HttpClient httpClient;
-        private RequestListener listener;
-        private HttpUriRequest request;
+        private final HttpClient httpClient;
+        private final RequestListener listener;
+        private final HttpUriRequest request;
 
         NetworkTask(HttpClient httpClient,
                     HttpUriRequest request,
@@ -93,10 +93,11 @@ public class Network
         @Override
 		public HttpResponse call() throws Exception
         {
+            final Thread myThread = Thread.currentThread();
             HttpResponse resp = null;
             Exception err = null;
             
-            if (Thread.interrupted())
+            if (myThread.isInterrupted())
             	return null;
             
             try {
@@ -106,11 +107,17 @@ public class Network
                 err = e;
             }
             
+            if (myThread.isInterrupted())
+                return null;
+
             final HttpResponse finalResp = resp;
             final Exception finalErr = err;
             handler.post(new Runnable() {
                 @Override
                 public void run() {
+                    if (myThread.isInterrupted())
+                        return;
+
                     if (finalErr != null) {
                         listener.onRequestError(finalErr);
                     } else if (finalResp != null) {
@@ -131,7 +138,7 @@ public class Network
 
     private static final Network instance = new Network();
 
-    private DefaultHttpClient httpClient;
+    private final DefaultHttpClient httpClient;
 
     public static synchronized Network get()
     {
