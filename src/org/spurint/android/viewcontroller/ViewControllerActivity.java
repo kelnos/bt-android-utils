@@ -6,8 +6,10 @@ import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.AccelerateInterpolator;
+import android.view.animation.AlphaAnimation;
 import android.view.animation.Animation;
 import android.view.animation.Animation.AnimationListener;
+import android.view.animation.ScaleAnimation;
 import android.view.animation.TranslateAnimation;
 import android.widget.ViewFlipper;
 
@@ -24,6 +26,8 @@ public class ViewControllerActivity extends Activity
         ZOOM
     }
     
+    private static class IdentityAnimation extends Animation { }
+
     private ViewFlipper rootView;
     private ViewController rootViewController;
     
@@ -65,7 +69,9 @@ public class ViewControllerActivity extends Activity
         return rootViewController;
     }
 
-    private static final int SLIDE_DURATION = 175;  /* milliseconds */
+    private static final int SLIDE_DURATION = 200;  /* milliseconds */
+    private static final int ALPHA_DURATION = 350;  /* milliseconds */
+    private static final int ZOOM_DURATION = 200; /* milliseconds */
     
     private void doAnimationCommon(int duration,
                                    final Animation oldViewAnim,
@@ -83,7 +89,8 @@ public class ViewControllerActivity extends Activity
         
         oldViewAnim.setAnimationListener(new AnimationListener()
         {
-            @Override public void onAnimationStart(Animation animation)
+            @Override
+            public void onAnimationStart(Animation animation)
             {
                 if (oldViewController != null)
                     oldViewController.dispatchViewWillDisappear(oldView);
@@ -112,7 +119,8 @@ public class ViewControllerActivity extends Activity
         });
         newViewAnim.setAnimationListener(new AnimationListener()
         {
-            @Override public void onAnimationStart(Animation animation)
+            @Override
+            public void onAnimationStart(Animation animation)
             {
                 if (newViewController != null)
                     newViewController.dispatchViewWillAppear(newView);
@@ -148,7 +156,7 @@ public class ViewControllerActivity extends Activity
         rootView.showNext();
     }
     
-    private void doSlideAnimation(final ViewController newViewController, boolean reverse)
+    private void doSlideHorizAnimation(final ViewController newViewController, boolean reverse)
     {
         final Animation oldViewAnim = new TranslateAnimation(TranslateAnimation.RELATIVE_TO_PARENT, 0f,
                                                              TranslateAnimation.RELATIVE_TO_PARENT, reverse ? 1f : -1f,
@@ -162,6 +170,48 @@ public class ViewControllerActivity extends Activity
                           newViewAnim, newViewController);
     }
     
+    private void doSlideVertAnimation(final ViewController newViewController, boolean reverse)
+    {
+        final Animation oldViewAnim = new TranslateAnimation(TranslateAnimation.RELATIVE_TO_PARENT, 0f,
+                                                             TranslateAnimation.RELATIVE_TO_PARENT, 0f,
+                                                             TranslateAnimation.RELATIVE_TO_PARENT, 0f,
+                                                             TranslateAnimation.RELATIVE_TO_PARENT, reverse ? 1f : -1f);
+        final Animation newViewAnim = new TranslateAnimation(TranslateAnimation.RELATIVE_TO_PARENT, 0f,
+                                                             TranslateAnimation.RELATIVE_TO_PARENT, 0f,
+                                                             TranslateAnimation.RELATIVE_TO_PARENT, reverse ? -1f : 1f,
+                                                             TranslateAnimation.RELATIVE_TO_PARENT, 0f);
+        doAnimationCommon(SLIDE_DURATION, oldViewAnim,
+                          newViewAnim, newViewController);
+    }
+
+    private void doFadeAnimation(final ViewController newViewController)
+    {
+        final Animation oldViewAnim = new AlphaAnimation(1f, 0f);
+        final Animation newViewAnim = new AlphaAnimation(0f, 1f);
+        doAnimationCommon(ALPHA_DURATION, oldViewAnim,
+                          newViewAnim, newViewController);
+    }
+
+    private void doZoomAnimation(final ViewController newViewController, boolean reverse)
+    {
+        float start, end;
+        if (reverse) {
+            start = 1f;
+            end = 0f;
+        } else {
+            start = 0f;
+            end = 1f;
+        }
+
+        final Animation viewAnim = new ScaleAnimation(start, end, start, end,
+                                                      Animation.RELATIVE_TO_SELF, 0.5f,
+                                                      Animation.RELATIVE_TO_SELF, 0.5f);
+        final Animation nullAnim = new IdentityAnimation();
+
+        doAnimationCommon(ZOOM_DURATION, reverse ? viewAnim : nullAnim,
+                          reverse ? nullAnim : viewAnim, newViewController);
+    }
+
     private void setContentViewControllerInternal(ViewController newViewController,
                                                   View newView)
     {
@@ -207,13 +257,18 @@ public class ViewControllerActivity extends Activity
         else {
             switch (animationType) {
                 case SLIDE_HORIZONTAL:
-                    doSlideAnimation(viewController, reverse);
+                    doSlideHorizAnimation(viewController, reverse);
+                    break;
+                case SLIDE_VERTICAL:
+                    doSlideVertAnimation(viewController, reverse);
                     break;
                 case FLIP:
-                    break;
+                    throw new UnsupportedOperationException("Transition animation type FLIP not yet implemented");
                 case FADE:
+                    doFadeAnimation(viewController);
                     break;
                 case ZOOM:
+                    doZoomAnimation(viewController, reverse);
                     break;
             }
         }
