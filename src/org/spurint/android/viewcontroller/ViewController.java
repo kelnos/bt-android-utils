@@ -26,7 +26,6 @@
 
 package org.spurint.android.viewcontroller;
 
-import android.app.Activity;
 import android.view.LayoutInflater;
 import android.view.View;
 
@@ -42,12 +41,12 @@ import android.view.View;
 public abstract class ViewController
 {
     private final int layoutId;
-    private final Activity activity;
+    private final ViewControllerActivity activity;
     private final View contentView;
     
     private NavigationController navigationController;
     
-    public ViewController(Activity activity, int layoutId)
+    public ViewController(ViewControllerActivity activity, int layoutId)
     {
         if (activity == null)
             throw new IllegalArgumentException("Activity cannot be null");
@@ -66,11 +65,35 @@ public abstract class ViewController
         activity.setContentView(contentView);
         onViewAppeared();
     }
+    
+    void dispatchViewWillAppear(View view)
+    {
+        if (view == contentView)
+            onViewWillAppear();
+    }
+    
+    void dispatchViewAppeared(View view)
+    {
+        if (view == contentView)
+            onViewAppeared();
+    }
+    
+    void dispatchViewWillDisappear(View view)
+    {
+        if (view == contentView)
+            onViewWillDisappear();
+    }
+    
+    void dispatchViewDisappeared(View view)
+    {
+        if (view == contentView)
+            onViewDisappeared();
+    }
 
     protected void onViewWillAppear() { }
     protected void onViewAppeared() { }
-    //protected void onViewWillDisappear() { }
-    //protected void onViewDisappeared() { }
+    protected void onViewWillDisappear() { }
+    protected void onViewDisappeared() { }
 
     protected void _setNavigationController(NavigationController navigationController)
     {
@@ -87,7 +110,7 @@ public abstract class ViewController
         return layoutId;
     }
 
-    protected Activity getActivity()
+    protected ViewControllerActivity getActivity()
     {
         return activity;
     }

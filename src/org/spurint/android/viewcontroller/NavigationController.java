@@ -28,13 +28,16 @@ package org.spurint.android.viewcontroller;
 
 import java.util.Stack;
 
-import android.app.Activity;
+import org.spurint.android.viewcontroller.ViewControllerActivity.TransitionAnimationType;
+
+import android.view.View;
 
 public class NavigationController extends ViewController
 {
     private final Stack<ViewController> viewControllers = new Stack<ViewController>();
+    private TransitionAnimationType transitionAnimation = TransitionAnimationType.SLIDE_HORIZONTAL;
 
-    public NavigationController(Activity activity, ViewController rootViewController)
+    public NavigationController(ViewControllerActivity activity, ViewController rootViewController)
     {
         super(activity, rootViewController.getLayoutId());
         viewControllers.push(rootViewController)._setNavigationController(this);
@@ -43,26 +46,50 @@ public class NavigationController extends ViewController
     @Override
     public void attachContentView()
     {
-        viewControllers.peek().attachContentView();
+        getActivity().setContentViewController(viewControllers.peek());
     }
 
-    public void pushViewController(ViewController viewController)
+    public void pushViewController(ViewController viewController, boolean animated)
     {
         viewControllers.push(viewController)._setNavigationController(this);
-        attachContentView();
+
+        if (animated && transitionAnimation != null)
+            getActivity().setContentViewController(viewController, transitionAnimation, false);
+        else
+            attachContentView();
     }
 
-    public void popViewController()
+    public void popViewController(boolean animated)
     {
         if (viewControllers.size() == 1)
             throw new RuntimeException("Can't pop root view controller");
         
         viewControllers.pop()._setNavigationController(null);
-        attachContentView();
+
+        if (animated && transitionAnimation != null)
+            getActivity().setContentViewController(viewControllers.peek(), transitionAnimation, true);
+        else
+            attachContentView();
     }
     
     public int getViewControllerCount()
     {
         return viewControllers.size();
+    }
+
+    public TransitionAnimationType getTransitionAnimation()
+    {
+        return transitionAnimation;
+    }
+
+    public void setTransitionAnimation(TransitionAnimationType transitionAnimation)
+    {
+        this.transitionAnimation = transitionAnimation;
+    }
+    
+    @Override
+    protected View getContentView()
+    {
+        return viewControllers.peek().getContentView();
     }
 }
