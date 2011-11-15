@@ -28,14 +28,14 @@ package org.spurint.android.viewcontroller;
 
 import java.util.Stack;
 
-import org.spurint.android.viewcontroller.ViewControllerActivity.TransitionAnimationType;
+import org.spurint.android.viewcontroller.ViewControllerActivity.TransitionType;
 
 import android.view.View;
 
 public class NavigationController extends ViewController
 {
     private final Stack<ViewController> viewControllers = new Stack<ViewController>();
-    private TransitionAnimationType transitionAnimation = TransitionAnimationType.SLIDE_HORIZONTAL;
+    private TransitionType transitionAnimation = TransitionType.SLIDE_HORIZONTAL;
 
     public NavigationController(ViewControllerActivity activity, ViewController rootViewController)
     {
@@ -77,12 +77,12 @@ public class NavigationController extends ViewController
         return viewControllers.size();
     }
 
-    public TransitionAnimationType getTransitionAnimation()
+    public TransitionType getTransitionAnimation()
     {
         return transitionAnimation;
     }
 
-    public void setTransitionAnimation(TransitionAnimationType transitionAnimation)
+    public void setTransitionAnimation(TransitionType transitionAnimation)
     {
         this.transitionAnimation = transitionAnimation;
     }

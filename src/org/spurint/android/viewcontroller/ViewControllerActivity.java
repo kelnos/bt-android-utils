@@ -20,7 +20,7 @@ public class ViewControllerActivity extends Activity
 {
     private static final String TAG = "ViewControllerActivity";
     
-    static enum TransitionAnimationType
+    static enum TransitionType
     {
         SLIDE_HORIZONTAL,
         SLIDE_VERTICAL,
@@ -242,11 +242,11 @@ public class ViewControllerActivity extends Activity
     private class VCTransition implements Runnable
     {
         private final ViewController viewController;
-        private final TransitionAnimationType transitionType;
+        private final TransitionType transitionType;
         private final boolean reverse;
 
         VCTransition(ViewController viewController,
-                     TransitionAnimationType transitionType,
+                     TransitionType transitionType,
                      boolean reverse)
         {
             this.viewController = viewController;
@@ -308,16 +308,16 @@ public class ViewControllerActivity extends Activity
     }
 
     protected void setContentViewController(ViewController viewController,
-                                            TransitionAnimationType animationType,
+                                            TransitionType transitionType,
                                             boolean reverse)
     {
-        if (animationType == null)
+        if (transitionType == null)
             throw new IllegalArgumentException("Animation Type cannot be null");
 
         if (visibleViewController == null)
             setContentViewController(viewController);
         else {
-            VCTransition trans = new VCTransition(viewController, animationType, reverse);
+            VCTransition trans = new VCTransition(viewController, transitionType, reverse);
             transQueue.add(trans);
             handleQueue();
         }
