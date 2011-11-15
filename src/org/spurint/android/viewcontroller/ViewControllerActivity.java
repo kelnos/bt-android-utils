@@ -1,5 +1,8 @@
 package org.spurint.android.viewcontroller;
 
+import java.util.LinkedList;
+import java.util.Queue;
+
 import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
@@ -72,7 +75,7 @@ public class ViewControllerActivity extends Activity
     private static final int SLIDE_DURATION = 200;  /* milliseconds */
     private static final int ALPHA_DURATION = 350;  /* milliseconds */
     private static final int ZOOM_DURATION = 200; /* milliseconds */
-    
+
     private void doAnimationCommon(int duration,
                                    final Animation oldViewAnim,
                                    final Animation newViewAnim,
@@ -115,6 +118,11 @@ public class ViewControllerActivity extends Activity
 
                 if (oldViewController != null)
                     oldViewController.dispatchViewDisappeared(oldView);
+
+                if (newViewAnim.hasEnded()) {
+                    curTransition = null;
+                    handleQueue();
+                }
             }
         });
         newViewAnim.setAnimationListener(new AnimationListener()
@@ -142,6 +150,11 @@ public class ViewControllerActivity extends Activity
 
                 if (newViewController != null)
                     newViewController.dispatchViewAppeared(newView);
+
+                if (oldViewAnim.hasEnded()) {
+                    curTransition = null;
+                    handleQueue();
+                }
             }
         });
 
@@ -226,6 +239,55 @@ public class ViewControllerActivity extends Activity
         visibleView = newView;
     }
 
+    private class VCTransition implements Runnable
+    {
+        private final ViewController viewController;
+        private final TransitionAnimationType transitionType;
+        private final boolean reverse;
+
+        VCTransition(ViewController viewController,
+                     TransitionAnimationType transitionType,
+                     boolean reverse)
+        {
+            this.viewController = viewController;
+            this.transitionType = transitionType;
+            this.reverse = reverse;
+        }
+
+        @Override
+        public void run()
+        {
+            switch (transitionType) {
+                case SLIDE_HORIZONTAL:
+                    doSlideHorizAnimation(viewController, reverse);
+                    break;
+                case SLIDE_VERTICAL:
+                    doSlideVertAnimation(viewController, reverse);
+                    break;
+                case FLIP:
+                    throw new UnsupportedOperationException("Transition animation type FLIP not yet implemented");
+                case FADE:
+                    doFadeAnimation(viewController);
+                    break;
+                case ZOOM:
+                    doZoomAnimation(viewController, reverse);
+                    break;
+            }
+        }
+    }
+
+    private final Queue<VCTransition> transQueue = new LinkedList<VCTransition>();
+    private VCTransition curTransition;
+
+    private void handleQueue()
+    {
+        if (curTransition == null) {
+            curTransition = transQueue.poll();
+            if (curTransition != null)
+                curTransition.run();
+        }
+    }
+
     protected void setContentViewController(ViewController newViewController)
     {
         ViewController oldViewController = visibleViewController;
@@ -255,22 +317,9 @@ public class ViewControllerActivity extends Activity
         if (visibleViewController == null)
             setContentViewController(viewController);
         else {
-            switch (animationType) {
-                case SLIDE_HORIZONTAL:
-                    doSlideHorizAnimation(viewController, reverse);
-                    break;
-                case SLIDE_VERTICAL:
-                    doSlideVertAnimation(viewController, reverse);
-                    break;
-                case FLIP:
-                    throw new UnsupportedOperationException("Transition animation type FLIP not yet implemented");
-                case FADE:
-                    doFadeAnimation(viewController);
-                    break;
-                case ZOOM:
-                    doZoomAnimation(viewController, reverse);
-                    break;
-            }
+            VCTransition trans = new VCTransition(viewController, animationType, reverse);
+            transQueue.add(trans);
+            handleQueue();
         }
     }
 }
