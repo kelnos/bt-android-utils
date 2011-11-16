@@ -42,12 +42,6 @@ public class NavigationController extends ViewController
         super(activity, rootViewController.getLayoutId());
         viewControllers.push(rootViewController)._setNavigationController(this);
     }
-    
-    @Override
-    public void attachContentView()
-    {
-        getActivity().setContentViewController(viewControllers.peek());
-    }
 
     public void pushViewController(ViewController viewController, boolean animated)
     {
@@ -56,20 +50,20 @@ public class NavigationController extends ViewController
         if (animated && transitionAnimation != null)
             getActivity().setContentViewController(viewController, transitionAnimation, false);
         else
-            attachContentView();
+            getActivity().setContentViewController(viewController);
     }
 
     public void popViewController(boolean animated)
     {
         if (viewControllers.size() == 1)
             throw new RuntimeException("Can't pop root view controller");
-        
+
         viewControllers.pop()._setNavigationController(null);
 
         if (animated && transitionAnimation != null)
             getActivity().setContentViewController(viewControllers.peek(), transitionAnimation, true);
         else
-            attachContentView();
+            getActivity().setContentViewController(viewControllers.peek());
     }
     
     public int getViewControllerCount()

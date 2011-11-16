@@ -58,14 +58,7 @@ public abstract class ViewController
         
         this.contentView = LayoutInflater.from(activity).inflate(this.layoutId, null);
     }
-    
-    public void attachContentView()
-    {
-        onViewWillAppear();
-        activity.setContentView(contentView);
-        onViewAppeared();
-    }
-    
+
     void dispatchViewWillAppear(View view)
     {
         if (view == contentView)
