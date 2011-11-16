@@ -26,7 +26,10 @@
 
 package org.spurint.android.viewcontroller;
 
+import android.view.ContextMenu;
+import android.view.ContextMenu.ContextMenuInfo;
 import android.view.LayoutInflater;
+import android.view.MenuItem;
 import android.view.View;
 
 /*
@@ -112,6 +115,9 @@ public abstract class ViewController
     {
         return contentView;
     }
+
+    public void onCreateContextMenu(ContextMenu menu, View view, ContextMenuInfo menuInfo) { }
+    public boolean onContextItemSelected(MenuItem item) { return false; }
 
     // FIXME: hack to make setting visibleViewController properly for nav
     // FIXME: controllers on first set.  not sure how i feel about this

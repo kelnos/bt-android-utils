@@ -6,6 +6,9 @@ import java.util.Queue;
 import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.ContextMenu;
+import android.view.ContextMenu.ContextMenuInfo;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.AccelerateInterpolator;
@@ -61,6 +64,24 @@ public class ViewControllerActivity extends Activity
         super.onBackPressed();
     }
     
+    @Override
+    public void onCreateContextMenu(ContextMenu menu,
+                                    View view,
+                                    ContextMenuInfo menuInfo)
+    {
+        super.onCreateContextMenu(menu, view, menuInfo);
+        if (visibleViewController != null)
+            visibleViewController.onCreateContextMenu(menu, view, menuInfo);
+    }
+
+    @Override
+    public boolean onContextItemSelected(MenuItem item)
+    {
+        if (visibleViewController != null)
+            return visibleViewController.onContextItemSelected(item);
+        return false;
+    }
+
     public void setRootViewController(ViewController vc)
     {
         this.rootViewController = vc;
