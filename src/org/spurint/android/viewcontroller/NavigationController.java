@@ -86,4 +86,10 @@ public class NavigationController extends ViewController
     {
         return viewControllers.peek().getContentView();
     }
+
+    @Override
+    ViewController getTopViewController()
+    {
+        return viewControllers.peek();
+    }
 }

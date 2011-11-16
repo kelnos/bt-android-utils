@@ -112,4 +112,11 @@ public abstract class ViewController
     {
         return contentView;
     }
+
+    // FIXME: hack to make setting visibleViewController properly for nav
+    // FIXME: controllers on first set.  not sure how i feel about this
+    ViewController getTopViewController()
+    {
+        return this;
+    }
 }

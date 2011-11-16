@@ -64,7 +64,7 @@ public class ViewControllerActivity extends Activity
     public void setRootViewController(ViewController vc)
     {
         this.rootViewController = vc;
-        setContentViewController(vc);
+        setContentViewController(vc.getTopViewController());
     }
     
     public ViewController getRootViewController()
