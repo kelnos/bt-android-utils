@@ -67,7 +67,6 @@ public class Network
                                                                        MAX_POOL_SIZE,
                                                                        30, TimeUnit.SECONDS,
                                                                        new LinkedBlockingQueue<Runnable>());
-    private static final Handler handler = new Handler();
 
     public interface RequestListener
     {
@@ -75,30 +74,38 @@ public class Network
         void onRequestError(Exception e);
     }
 
-    private static class NetworkTask implements Callable<HttpResponse>
+    private static class NetworkTask implements Callable<HttpResponse>,
+                                                Runnable
     {
         private final HttpClient httpClient;
         private final RequestListener listener;
         private final HttpUriRequest request;
+        private final Handler handler;
+
+        private Thread taskThread;
+        private HttpResponse finalResponse;
+        private Exception finalError;
 
         NetworkTask(HttpClient httpClient,
                     HttpUriRequest request,
-                    RequestListener listener)
+                    RequestListener listener,
+                    Handler handler)
         {
             this.httpClient = httpClient;
             this.request = request;
             this.listener = listener;
+            this.handler = handler;
         }
 
         @Override
-		public HttpResponse call() throws Exception
+        public HttpResponse call() throws Exception
         {
-            final Thread myThread = Thread.currentThread();
+            taskThread = Thread.currentThread();
             HttpResponse resp = null;
             Exception err = null;
             
-            if (myThread.isInterrupted())
-            	return null;
+            if (taskThread.isInterrupted())
+                return null;
             
             try {
                 Log.d(TAG, "starting http request");
@@ -107,29 +114,33 @@ public class Network
                 err = e;
             }
             
-            if (myThread.isInterrupted())
+            if (taskThread.isInterrupted())
                 return null;
 
-            final HttpResponse finalResp = resp;
-            final Exception finalErr = err;
-            handler.post(new Runnable() {
-                @Override
-                public void run() {
-                    if (myThread.isInterrupted())
-                        return;
+            finalResponse = resp;
+            finalError = err;
 
-                    if (finalErr != null) {
-                        listener.onRequestError(finalErr);
-                    } else if (finalResp != null) {
-                        Log.d(TAG, "got http response code " + finalResp.getStatusLine().getStatusCode());
-                        HttpEntity entity = finalResp.getEntity();
-                        Log.d(TAG, "body is type " + entity.getContentType() + ", length " + entity.getContentLength());
-                        listener.onRequestFinished(finalResp);
-                    } 
-                }
-            });
-            
+            if (handler != null)
+                handler.post(this);
+            else
+                run();
+
             return resp;
+        }
+
+        // this is only for handling the response, not for running the task
+        @Override
+        public void run() {
+            if (!taskThread.isInterrupted()) {
+                if (finalError != null) {
+                    listener.onRequestError(finalError);
+                } else if (finalResponse != null) {
+                    Log.d(TAG, "got http response code " + finalResponse.getStatusLine().getStatusCode());
+                    HttpEntity entity = finalResponse.getEntity();
+                    Log.d(TAG, "body is type " + entity.getContentType() + ", length " + entity.getContentLength());
+                    listener.onRequestFinished(finalResponse);
+                }
+            }
         }
     }
 
@@ -176,9 +187,17 @@ public class Network
         });
     }
 
-    public Future<HttpResponse> execute(final HttpUriRequest request, final RequestListener listener)
+    public Future<HttpResponse> execute(HttpUriRequest request,
+                                        RequestListener listener,
+                                        Handler handler)
     {
-        NetworkTask task = new NetworkTask(httpClient, request, listener);
-        return pool.submit(task);
+        NetworkTask task = new NetworkTask(httpClient, request, listener, handler);
+        return pool.submit((Callable<HttpResponse>)task);
+    }
+
+    public Future<HttpResponse> execute(HttpUriRequest request,
+                                        RequestListener listener)
+    {
+        return execute(request, listener, null);
     }
 }
