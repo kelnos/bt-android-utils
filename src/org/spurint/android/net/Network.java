@@ -36,8 +36,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.http.Header;
-import org.apache.http.HttpEntity;
 import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpRequestInterceptor;
@@ -58,11 +56,10 @@ import org.apache.http.protocol.HttpContext;
 
 import android.os.Build;
 import android.os.Handler;
-import android.util.Log;
 
 public class Network
 {
-    private static final String TAG = "Network";
+    //private static final String TAG = "Network";
 
     private static final int CORE_POOL_SIZE = 4;
     private static final int MAX_POOL_SIZE = CORE_POOL_SIZE;
@@ -117,7 +114,7 @@ public class Network
                 return null;
 
             try {
-                Log.d(TAG, "starting http request");
+                //Log.d(TAG, "starting http request");
                 resp = httpClient.execute(request);
             } catch (Exception e) {
                 err = e;
@@ -148,9 +145,9 @@ public class Network
                 if (finalError != null) {
                     listener.onRequestError(token, finalError);
                 } else if (finalResponse != null) {
-                    Log.d(TAG, "got http response code " + finalResponse.getStatusLine().getStatusCode());
-                    HttpEntity entity = finalResponse.getEntity();
-                    Log.d(TAG, "body is type " + entity.getContentType() + ", length " + entity.getContentLength());
+                    //Log.d(TAG, "got http response code " + finalResponse.getStatusLine().getStatusCode());
+                    //HttpEntity entity = finalResponse.getEntity();
+                    //Log.d(TAG, "body is type " + entity.getContentType() + ", length " + entity.getContentLength());
                     listener.onRequestFinished(token);
                 }
             }
@@ -192,10 +189,10 @@ public class Network
                 Locale locale = Locale.getDefault();
                 String localeStr = locale.getLanguage() + "_" + locale.getCountry();
                 request.setHeader("User-Agent", "BTNetwork (Android; Android OS " + Build.VERSION.RELEASE + "; " + localeStr + ")");
-                Header[] headers = request.getAllHeaders();
+                /*Header[] headers = request.getAllHeaders();
                 for (Header h : headers) {
                     Log.d(TAG, h.getName() + ": " + h.getValue());
-                }
+                }*/
             }
         });
 
