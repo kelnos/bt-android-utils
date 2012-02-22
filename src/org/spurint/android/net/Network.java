@@ -27,6 +27,7 @@
 package org.spurint.android.net;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.Locale;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -41,6 +42,8 @@ import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpRequestInterceptor;
 import org.apache.http.HttpResponse;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.scheme.PlainSocketFactory;
@@ -60,7 +63,7 @@ import android.util.Log;
 public class Network
 {
     private static final String TAG = "Network";
-    
+
     private static final int CORE_POOL_SIZE = 4;
     private static final int MAX_POOL_SIZE = CORE_POOL_SIZE;
     private static final ExecutorService pool = new ThreadPoolExecutor(CORE_POOL_SIZE,
@@ -70,8 +73,8 @@ public class Network
 
     public interface RequestListener
     {
-        void onRequestFinished(HttpResponse resp);
-        void onRequestError(Exception e);
+        void onRequestFinished(Future<HttpResponse> requestToken);
+        void onRequestError(Future<HttpResponse> requestToken, Exception e);
     }
 
     private static class NetworkTask implements Callable<HttpResponse>,
@@ -85,6 +88,7 @@ public class Network
         private Thread taskThread;
         private HttpResponse finalResponse;
         private Exception finalError;
+        private Future<HttpResponse> token;
 
         NetworkTask(HttpClient httpClient,
                     HttpUriRequest request,
@@ -97,28 +101,37 @@ public class Network
             this.handler = handler;
         }
 
+        public void setToken(Future<HttpResponse> token)
+        {
+            this.token = token;
+        }
+
         @Override
         public HttpResponse call() throws Exception
         {
             taskThread = Thread.currentThread();
             HttpResponse resp = null;
             Exception err = null;
-            
+
             if (taskThread.isInterrupted())
                 return null;
-            
+
             try {
                 Log.d(TAG, "starting http request");
                 resp = httpClient.execute(request);
             } catch (Exception e) {
                 err = e;
             }
-            
+
             if (taskThread.isInterrupted())
                 return null;
 
             finalResponse = resp;
             finalError = err;
+
+            // this is so dirty
+            while (token == null)
+                Thread.sleep(50);
 
             if (handler != null)
                 handler.post(this);
@@ -133,12 +146,12 @@ public class Network
         public void run() {
             if (!taskThread.isInterrupted()) {
                 if (finalError != null) {
-                    listener.onRequestError(finalError);
+                    listener.onRequestError(token, finalError);
                 } else if (finalResponse != null) {
                     Log.d(TAG, "got http response code " + finalResponse.getStatusLine().getStatusCode());
                     HttpEntity entity = finalResponse.getEntity();
                     Log.d(TAG, "body is type " + entity.getContentType() + ", length " + entity.getContentLength());
-                    listener.onRequestFinished(finalResponse);
+                    listener.onRequestFinished(token);
                 }
             }
         }
@@ -185,6 +198,46 @@ public class Network
                 }
             }
         });
+
+        /*
+        // Create AuthCache instance
+        AuthCache authCache = new BasicAuthCache();
+        // Generate BASIC scheme object and add it to the local
+        // auth cache
+        BasicScheme basicAuth = new BasicScheme();
+        authCache.put(targetHost, basicAuth);
+
+        // Add AuthCache to the execution context
+        BasicHttpContext localcontext = new BasicHttpContext();
+        localcontext.setAttribute(ClientContext.AUTH_CACHE, authCache);
+*/
+    }
+
+    public void setCredentials(HttpUriRequest request, String username, String password)
+    {
+        URI uri = request.getURI();
+        if (uri == null)
+            return;
+
+        String host = uri.getHost();
+        if (host == null)
+            return;
+
+        int port = uri.getPort();
+        if (port == 0) {
+            if (uri.getScheme() == null)
+                return;
+
+            if (uri.getScheme().equals("http"))
+                port = 80;
+            else if (uri.getScheme().equals("https"))
+                port = 443;
+            else
+                return;
+        }
+
+        httpClient.getCredentialsProvider().setCredentials(new AuthScope(host, port),
+                                                           new UsernamePasswordCredentials(username, password));
     }
 
     public Future<HttpResponse> execute(HttpUriRequest request,
@@ -192,7 +245,9 @@ public class Network
                                         Handler handler)
     {
         NetworkTask task = new NetworkTask(httpClient, request, listener, handler);
-        return pool.submit((Callable<HttpResponse>)task);
+        Future<HttpResponse> requestToken = pool.submit((Callable<HttpResponse>)task);
+        task.setToken(requestToken);
+        return requestToken;
     }
 
     public Future<HttpResponse> execute(HttpUriRequest request,
