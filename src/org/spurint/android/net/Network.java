@@ -29,7 +29,9 @@ package org.spurint.android.net;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -37,6 +39,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.http.Header;
 import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpRequestInterceptor;
@@ -71,6 +74,7 @@ public class Network
 
     public interface RequestListener
     {
+        void onRequestHeadersReceived(Future<HttpResponse> requestToken, int statusCode, String statusCodeMessage, Map<String,String> headers);
         void onRequestReceivedBodyData(Future<HttpResponse> requestToken, byte[] data, int dataLength, long totalBytesRead, long totalExpectedLength);
         void onRequestFinished(Future<HttpResponse> requestToken);
         void onRequestError(Future<HttpResponse> requestToken, Exception e);
@@ -131,6 +135,14 @@ public class Network
             // this is so dirty
             while (token == null)
                 Thread.sleep(50);
+
+            if (resp != null && finalError != null && listener != null) {
+                Map<String,String> headers = new HashMap<String,String>(resp.getAllHeaders().length);
+                for (Header h : resp.getAllHeaders())
+                    headers.put(h.getName(), h.getValue());
+                listener.onRequestHeadersReceived(token, resp.getStatusLine().getStatusCode(),
+                                                  resp.getStatusLine().getReasonPhrase(), headers);
+            }
 
             if (resp != null && finalError == null && resp.getEntity() != null) {
                 final long contentLength = resp.getEntity().getContentLength();
