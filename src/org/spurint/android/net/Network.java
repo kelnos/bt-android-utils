@@ -27,6 +27,7 @@
 package org.spurint.android.net;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.util.Locale;
 import java.util.concurrent.Callable;
@@ -70,6 +71,7 @@ public class Network
 
     public interface RequestListener
     {
+        void onRequestReceivedBodyData(Future<HttpResponse> requestToken, byte[] data, int dataLength, long totalBytesRead, long totalExpectedLength);
         void onRequestFinished(Future<HttpResponse> requestToken);
         void onRequestError(Future<HttpResponse> requestToken, Exception e);
     }
@@ -130,10 +132,60 @@ public class Network
             while (token == null)
                 Thread.sleep(50);
 
-            if (handler != null)
-                handler.post(this);
-            else
-                run();
+            if (resp != null && finalError == null && resp.getEntity() != null) {
+                final long contentLength = resp.getEntity().getContentLength();
+
+                if (contentLength != 0) {
+                    InputStream is = null;
+
+                    try {
+                        is = resp.getEntity().getContent();
+                        byte[] buf = new byte[RESPONSE_ENTITY_BUFFER_SIZE];
+
+                        long totalBytesRead = 0;
+                        int bin;
+                        while ((bin = is.read(buf)) != -1) {
+                            if (taskThread.isInterrupted()) {
+                                resp = null;
+                                break;
+                            }
+
+                            if (bin > 0) {
+                                totalBytesRead += bin;
+
+                                if (handler != null && listener != null) {
+                                    final long fTotalBytesRead = totalBytesRead;
+                                    final byte[] fBuf = new byte[bin];
+                                    System.arraycopy(buf, 0, fBuf, 0, bin);
+
+                                    handler.post(new Runnable()
+                                    {
+                                        @Override
+                                        public void run()
+                                        {
+                                            listener.onRequestReceivedBodyData(token, fBuf, fBuf.length, fTotalBytesRead, contentLength);
+                                        }
+                                    });
+                                } else if (listener != null) {
+                                    listener.onRequestReceivedBodyData(token, buf, bin, totalBytesRead, contentLength);
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        finalError = e;
+                    } finally {
+                        if (is != null)
+                            try { is.close(); } catch (IOException e) { }
+                    }
+                }
+            }
+
+            if (listener != null && !taskThread.isInterrupted()) {
+                if (handler != null)
+                    handler.post(this);
+                else
+                    run();
+            }
 
             return resp;
         }
@@ -156,6 +208,7 @@ public class Network
 
     private static final int CONN_TIMEOUT = 30000;
     private static final int SO_TIMEOUT = 45000;
+    private static final int RESPONSE_ENTITY_BUFFER_SIZE = 512 * 1024;  /* 512 kB */
 
     private static final Network instance = new Network();
 
