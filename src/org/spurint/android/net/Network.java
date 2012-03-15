@@ -136,15 +136,15 @@ public class Network
             while (token == null)
                 Thread.sleep(50);
 
-            if (resp != null && finalError != null && listener != null) {
+            if (!taskThread.isInterrupted() && resp != null && finalError != null && listener != null) {
                 Map<String,String> headers = new HashMap<String,String>(resp.getAllHeaders().length);
                 for (Header h : resp.getAllHeaders())
-                    headers.put(h.getName(), h.getValue());
+                    headers.put(h.getName().toLowerCase(), h.getValue());
                 listener.onRequestHeadersReceived(token, resp.getStatusLine().getStatusCode(),
                                                   resp.getStatusLine().getReasonPhrase(), headers);
             }
 
-            if (resp != null && finalError == null && resp.getEntity() != null) {
+            if (!taskThread.isInterrupted() && resp != null && finalError == null && resp.getEntity() != null) {
                 final long contentLength = resp.getEntity().getContentLength();
 
                 if (contentLength != 0) {
