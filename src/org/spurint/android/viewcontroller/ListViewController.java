@@ -26,26 +26,39 @@
 
 package org.spurint.android.viewcontroller;
 
-import org.spurint.android.R;
-
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ListAdapter;
 import android.widget.ListView;
 
 public class ListViewController extends ViewController
 {
-    private final ListView listView;
-    
+    private ListView listView;
+
     public ListViewController(ViewControllerActivity activity)
     {
-        super(activity, R.layout.list_content);
-        listView = (ListView)getContentView();
+        super(activity, 0);
     }
-    
+
+    @Override
+    protected View getContentView()
+    {
+        if (listView == null) {
+            listView = new ListView(getActivity());
+            listView.setId(android.R.id.list);
+            listView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                                                                ViewGroup.LayoutParams.MATCH_PARENT));
+            listView.setDrawSelectorOnTop(false);
+        }
+
+        return listView;
+    }
+
     public ListView getListView()
     {
         return listView;
     }
-    
+
     public void setListAdapter(ListAdapter adapter)
     {
         listView.setAdapter(adapter);

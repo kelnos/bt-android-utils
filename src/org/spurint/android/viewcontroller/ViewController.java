@@ -53,13 +53,17 @@ public abstract class ViewController
     {
         if (activity == null)
             throw new IllegalArgumentException("Activity cannot be null");
-        if (layoutId == 0)
-            throw new IllegalArgumentException("Layout ID cannot be 0");
         
         this.activity = activity;
         this.layoutId = layoutId;
         
-        this.contentView = LayoutInflater.from(activity).inflate(this.layoutId, null);
+        if (this.layoutId != 0)
+            this.contentView = LayoutInflater.from(activity).inflate(this.layoutId, null);
+        else
+            this.contentView = getContentView();
+
+        if (this.contentView == null)
+            throw new IllegalArgumentException("Unable to get content view for view controller");
     }
 
     void dispatchViewWillAppear(View view)
