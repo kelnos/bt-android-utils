@@ -5,7 +5,6 @@ import java.util.Queue;
 
 import android.app.Activity;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
 import android.view.MenuItem;
@@ -21,8 +20,8 @@ import android.widget.ViewFlipper;
 
 public class ViewControllerActivity extends Activity
 {
-    private static final String TAG = "ViewControllerActivity";
-    
+    //private static final String TAG = "ViewControllerActivity";
+
     static enum TransitionType
     {
         SLIDE_HORIZONTAL,
@@ -31,25 +30,25 @@ public class ViewControllerActivity extends Activity
         FADE,
         ZOOM
     }
-    
+
     private static class IdentityAnimation extends Animation { }
 
     private ViewFlipper rootView;
     private ViewController rootViewController;
-    
+
     private ViewController visibleViewController;
     private View visibleView;
-    
+
     @Override
     public void onCreate(Bundle bundle)
     {
         super.onCreate(bundle);
-        
+
         rootView = new ViewFlipper(this);
         rootView.setAutoStart(false);
         super.setContentView(rootView);
     }
-    
+
     @Override
     public void onBackPressed()
     {
@@ -63,7 +62,7 @@ public class ViewControllerActivity extends Activity
 
         super.onBackPressed();
     }
-    
+
     @Override
     public void onCreateContextMenu(ContextMenu menu,
                                     View view,
@@ -87,7 +86,7 @@ public class ViewControllerActivity extends Activity
         this.rootViewController = vc;
         setContentViewController(vc.getTopViewController());
     }
-    
+
     public ViewController getRootViewController()
     {
         return rootViewController;
@@ -110,7 +109,7 @@ public class ViewControllerActivity extends Activity
         oldViewAnim.setInterpolator(new AccelerateInterpolator());
         newViewAnim.setDuration(duration);
         newViewAnim.setInterpolator(new AccelerateInterpolator());
-        
+
         oldViewAnim.setAnimationListener(new AnimationListener()
         {
             @Override
@@ -189,7 +188,7 @@ public class ViewControllerActivity extends Activity
         rootView.setInAnimation(newViewAnim);
         rootView.showNext();
     }
-    
+
     private void doSlideHorizAnimation(final ViewController newViewController, boolean reverse)
     {
         final Animation oldViewAnim = new TranslateAnimation(TranslateAnimation.RELATIVE_TO_PARENT, 0f,
@@ -203,7 +202,7 @@ public class ViewControllerActivity extends Activity
         doAnimationCommon(SLIDE_DURATION, oldViewAnim,
                           newViewAnim, newViewController);
     }
-    
+
     private void doSlideVertAnimation(final ViewController newViewController, boolean reverse)
     {
         final Animation oldViewAnim = new TranslateAnimation(TranslateAnimation.RELATIVE_TO_PARENT, 0f,
