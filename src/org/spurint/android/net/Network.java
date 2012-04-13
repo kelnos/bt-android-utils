@@ -136,12 +136,27 @@ public class Network
             while (token == null)
                 Thread.sleep(50);
 
-            if (!taskThread.isInterrupted() && resp != null && finalError != null && listener != null) {
-                Map<String,String> headers = new HashMap<String,String>(resp.getAllHeaders().length);
+            if (!taskThread.isInterrupted() && resp != null && finalError == null && listener != null) {
+                final Map<String,String> headers = new HashMap<String,String>(resp.getAllHeaders().length);
                 for (Header h : resp.getAllHeaders())
                     headers.put(h.getName().toLowerCase(), h.getValue());
-                listener.onRequestHeadersReceived(token, resp.getStatusLine().getStatusCode(),
-                                                  resp.getStatusLine().getReasonPhrase(), headers);
+
+                if (handler != null) {
+                    handler.post(new Runnable()
+                    {
+                        @Override
+                        public void run()
+                        {
+                            listener.onRequestHeadersReceived(token,
+                                                              finalResponse.getStatusLine().getStatusCode(),
+                                                              finalResponse.getStatusLine().getReasonPhrase(),
+                                                              headers);
+                        }
+                    });
+                } else {
+                    listener.onRequestHeadersReceived(token, resp.getStatusLine().getStatusCode(),
+                                                      resp.getStatusLine().getReasonPhrase(), headers);
+                }
             }
 
             if (!taskThread.isInterrupted() && resp != null && finalError == null && resp.getEntity() != null) {
