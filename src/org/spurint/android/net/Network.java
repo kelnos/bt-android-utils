@@ -120,7 +120,6 @@ public class Network
                 return null;
 
             try {
-                //Log.d(TAG, "starting http request");
                 resp = httpClient.execute(request);
             } catch (Exception e) {
                 err = e;
@@ -136,13 +135,13 @@ public class Network
             while (token == null)
                 Thread.sleep(50);
 
-            if (!taskThread.isInterrupted() && resp != null && finalError == null && listener != null) {
-                final Map<String,String> headers = new HashMap<String,String>(resp.getAllHeaders().length);
-                for (Header h : resp.getAllHeaders())
-                    headers.put(h.getName().toLowerCase(), h.getValue());
+            if (resp != null && err == null && listener != null) {
+                if (!taskThread.isInterrupted()) {
+                    final Map<String,String> headers = new HashMap<String,String>(resp.getAllHeaders().length);
+                    for (Header h : resp.getAllHeaders())
+                        headers.put(h.getName().toLowerCase(), h.getValue());
 
-                if (handler != null) {
-                    handler.post(new Runnable()
+                    Runnable r = new Runnable()
                     {
                         @Override
                         public void run()
@@ -152,62 +151,63 @@ public class Network
                                                               finalResponse.getStatusLine().getReasonPhrase(),
                                                               headers);
                         }
-                    });
-                } else {
-                    listener.onRequestHeadersReceived(token, resp.getStatusLine().getStatusCode(),
-                                                      resp.getStatusLine().getReasonPhrase(), headers);
+                    };
+
+                    if (handler != null)
+                        handler.post(r);
+                    else
+                        r.run();
                 }
-            }
 
-            if (!taskThread.isInterrupted() && resp != null && finalError == null && resp.getEntity() != null) {
-                final long contentLength = resp.getEntity().getContentLength();
+                if (!taskThread.isInterrupted() && resp.getEntity() != null) {
+                    final long contentLength = resp.getEntity().getContentLength();
 
-                if (contentLength != 0) {
-                    InputStream is = null;
+                    if (contentLength != 0) {
+                        InputStream is = null;
 
-                    try {
-                        is = resp.getEntity().getContent();
-                        byte[] buf = new byte[RESPONSE_ENTITY_BUFFER_SIZE];
+                        try {
+                            is = resp.getEntity().getContent();
+                            byte[] buf = new byte[RESPONSE_ENTITY_BUFFER_SIZE];
 
-                        long totalBytesRead = 0;
-                        int bin;
-                        while ((bin = is.read(buf)) != -1) {
-                            if (taskThread.isInterrupted()) {
-                                resp = null;
-                                break;
-                            }
+                            long totalBytesRead = 0;
+                            int bin;
+                            while ((bin = is.read(buf)) != -1) {
+                                if (taskThread.isInterrupted()) {
+                                    resp = null;
+                                    break;
+                                }
 
-                            if (bin > 0) {
-                                totalBytesRead += bin;
+                                if (bin > 0) {
+                                    totalBytesRead += bin;
 
-                                if (handler != null && listener != null) {
-                                    final long fTotalBytesRead = totalBytesRead;
-                                    final byte[] fBuf = new byte[bin];
-                                    System.arraycopy(buf, 0, fBuf, 0, bin);
+                                    if (handler != null && listener != null) {
+                                        final long fTotalBytesRead = totalBytesRead;
+                                        final byte[] fBuf = new byte[bin];
+                                        System.arraycopy(buf, 0, fBuf, 0, bin);
 
-                                    handler.post(new Runnable()
-                                    {
-                                        @Override
-                                        public void run()
+                                        handler.post(new Runnable()
                                         {
-                                            listener.onRequestReceivedBodyData(token, fBuf, fBuf.length, fTotalBytesRead, contentLength);
-                                        }
-                                    });
-                                } else if (listener != null) {
-                                    listener.onRequestReceivedBodyData(token, buf, bin, totalBytesRead, contentLength);
+                                            @Override
+                                            public void run()
+                                            {
+                                                listener.onRequestReceivedBodyData(token, fBuf, fBuf.length, fTotalBytesRead, contentLength);
+                                            }
+                                        });
+                                    } else if (listener != null)
+                                        listener.onRequestReceivedBodyData(token, buf, bin, totalBytesRead, contentLength);
                                 }
                             }
+                        } catch (Exception e) {
+                            finalError = e;
+                        } finally {
+                            if (is != null)
+                                try { is.close(); } catch (IOException e) { }
                         }
-                    } catch (Exception e) {
-                        finalError = e;
-                    } finally {
-                        if (is != null)
-                            try { is.close(); } catch (IOException e) { }
                     }
                 }
             }
 
-            if (listener != null && !taskThread.isInterrupted()) {
+            if (!taskThread.isInterrupted() && listener != null) {
                 if (handler != null)
                     handler.post(this);
                 else
