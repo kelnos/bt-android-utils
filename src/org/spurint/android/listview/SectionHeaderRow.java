@@ -47,7 +47,6 @@ public class SectionHeaderRow extends ListRow {
 
     	final LayoutInflater inflater = (LayoutInflater)context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         final TextView text = (TextView)inflater.inflate(R.layout.preference_category, null);
-        android.util.Log.d("foo", "inflated pref category is a " + text.getClass().getName());
         text.setText(title);
         
         layout.addView(text,
